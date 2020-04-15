@@ -3,6 +3,8 @@ import requests
 import json
 import os
 from bs4 import BeautifulSoup
+import gevent
+from gevent import monkey
 
 def get_app_list_data():
     f = open("./data/app_list_save.csv",'r')
@@ -10,17 +12,29 @@ def get_app_list_data():
     item_json = {}
     num = 0
     for line in f.readlines():
-        item_json = json.loads(line)
-        href = item_json['href']
-        name = item_json['name']
-        category = item_json['category']
-        data_json = parse_page(href)
-        data_json.update(item_json)
-        # print(json.dumps(data_json))
-        fw.write(json.dumps(data_json) + "\n")
-        fw.flush()
+        try:
+            item_json = json.loads(line)
+            href = item_json['href']
+            name = item_json['name']
+            category = item_json['category']
+            data_json = parse_page(href)
+            count = 0
+            while count <=3:
+                if data_json["rating"] != 0:
+                    break
+                data_json = parse_page(href)
+                count+=1
+            data_json.update(item_json)
+            # print(json.dumps(data_json))
+            fw.write(json.dumps(data_json) + "\n")
+            fw.flush()
+        except Exception as identifier:
+             print(identifier)
     f.close()
     fw.close()
+
+def download_info(source_hrefs):
+    pass
 
 def parse_page(url):
     res_json = {}
@@ -53,22 +67,17 @@ def parse_page(url):
         option+=option_span.string.strip()
     res_json["option"] = option
 
-    #download 
-    download_times = soup.select("body > div.container > div:nth-child(4) > div > section > ul > li:nth-child(3) > span")
-    times = ''
-    for time_span in download_times:
-        if  time_span.string:
-            times = time_span.string.strip()
-    res_json["download_times"] = times
-
-    #language
-    languages = soup.select("body > div.container > div:nth-child(4) > div > section > ul > li:nth-child(4) > span")
-    language = ''
-    for language_span in languages:
-        if language_span.string:
-            language = language_span.string.strip()
-    res_json["language"] = language
-    # print(language)
+    #infos,[language,download]
+    infos = soup.select("body > div.container > div:nth-child(4) > div > section > ul > li")
+    res_json.setdefault("download_times",'')
+    res_json.setdefault("language",'')
+    for info_item in infos[:-1]:
+        info_item_name = info_item.div.string.strip()
+        info_item_value = info_item.span.string.strip()
+        if info_item_name == "下载":
+            res_json["download_times"] = info_item_value
+        if info_item_name == "语言":
+            res_json["language"] = info_item_value
 
     #brief
     briefs =soup.select("body > div.container > div:nth-child(6) > div > section > p")
@@ -78,10 +87,14 @@ def parse_page(url):
         brief += brief_p 
     res_json["brief"] = brief
 
-
+    # print(json.dumps(res_json))
     return res_json
+
+def update():
+    pass
+
 
 if __name__ == '__main__':
     get_app_list_data()
-    # parse_page("http://app.shafa.com/apk/yunshitinghudianjing.html")
-    # parse_page("http://app.shafa.com/apk/sanlingzhinengkongdiaoTVban.html")
+    # parse_page("http://app.shafa.com/apk/huangjinkuanggong1.html")
+    # parse_page("http://app.shafa.com/apk/huashudingdingketang.html")
